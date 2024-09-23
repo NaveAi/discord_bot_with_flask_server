@@ -83,8 +83,8 @@ def run_bot():
 # הגדרת WSGI application
 def application(environ, start_response):
     status = '200 OK'
-    output = b'הבוט פועל!'
-    response_headers = [('Content-type', 'text/plain'), ('Content-Length', str(len(output)))]
+    output = 'הבוט פועל!'.encode('utf-8')  # קידוד ל-UTF-8
+    response_headers = [('Content-type', 'text/plain; charset=utf-8'), ('Content-Length', str(len(output)))]
     start_response(status, response_headers)
     return [output]
 
