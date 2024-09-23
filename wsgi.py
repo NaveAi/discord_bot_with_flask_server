@@ -5,6 +5,14 @@ import cohere
 from threading import Thread
 import asyncio
 
+# בדיקת משתני סביבה
+print("DISCORD_TOKEN:", os.environ.get("DISCORD_TOKEN"))
+print("COHERE_API:", os.environ.get("COHERE_API"))
+
+# הגדרת הלוגר
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 # הגדרת ה-DiscordBot
 class DiscordBot:
     def __init__(self):
@@ -20,20 +28,21 @@ class DiscordBot:
         
         self.client = discord.Client(intents=intents)
         self.co = cohere.Client(self.COHERE_API)
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
         self.setup_bot()
 
     def setup_bot(self):
         @self.client.event
         async def on_ready():
-            logging.info(f'הבוט {self.client.user} מחובר בהצלחה!')
+            logger.info(f'הבוט {self.client.user} מחובר בהצלחה!')
+            global bot_is_ready
+            bot_is_ready = True
 
         @self.client.event
         async def on_message(message):
             await self.handle_message(message)
 
     async def handle_message(self, message):
-        logging.info(f'קיבלתי הודעה מ-{message.author}: {message.content}')
+        logger.info(f'קיבלתי הודעה מ-{message.author}: {message.content}')
         if message.author == self.client.user:
             return
         if message.reference or self.client.user in message.mentions:
@@ -44,7 +53,7 @@ class DiscordBot:
     async def respond_to_mention(self, message):
         content = message.content
         try:
-            logging.info('מתקשר עם Cohere לשליחת הודעה...')
+            logger.info('מתקשר עם Cohere לשליחת הודעה...')
             
             chat_history = []
             async for msg in message.channel.history(limit=10):
@@ -60,13 +69,13 @@ class DiscordBot:
                 preamble=self.PREAMBLE,
                 temperature=self.TEMPERATURE
             )
-            logging.info('קיבלתי תגובה מ-Cohere בהצלחה.')
+            logger.info('קיבלתי תגובה מ-Cohere בהצלחה.')
             await message.channel.send(response.text)
         except cohere.CohereAPIError as e:
-            logging.error(f'שגיאה ב-API של Cohere: {e}')
+            logger.error(f'שגיאה ב-API של Cohere: {e}')
             await message.channel.send("שגיאה בתקשורת עם Cohere, נסה שוב מאוחר יותר.")
         except Exception as e:
-            logging.error(f'שגיאה כללית: {e}')
+            logger.error(f'שגיאה כללית: {e}')
             await message.channel.send("אירעה שגיאה פנימית. נסה שוב מאוחר יותר.")
 
     async def handle_command(self, message):
@@ -74,47 +83,47 @@ class DiscordBot:
             await message.channel.send('שלום!')
 
     def run(self):
-        logging.info('מתחיל להריץ את הבוט...')
+        logger.info('מתחיל להריץ את הבוט...')
         try:
             self.client.run(self.DISCORD_TOKEN)
         except Exception as e:
-            logging.error(f'שגיאה בהרצת הבוט: {e}')
+            logger.error(f'שגיאה בהרצת הבוט: {e}')
 
-# משתנה גלובלי לסימון מצב הבוט
+# משתנים גלובליים לסימון מצב הבוט
 bot_is_ready = False
+bot_thread = None
 
 # פונקציה להרצת הבוט ב-Thread
 def run_bot():
-    global bot_is_ready
+    global bot_is_ready, bot_thread
+    logger.info('מתחיל את פונקציית run_bot...')
     bot = DiscordBot()
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(bot.client.login(bot.DISCORD_TOKEN))
-    bot_is_ready = True
-    loop.run_until_complete(bot.client.connect())
+    bot.run()
 
 # הגדרת WSGI application
 def application(environ, start_response):
-    global bot_is_ready
+    global bot_is_ready, bot_thread
+    logger.info('WSGI application נקראה.')
     status = '200 OK'
-    if bot_is_ready:
+    
+    if bot_thread is None:
+        logger.info('מתחיל את ה-Thread של הבוט...')
+        bot_thread = Thread(target=run_bot)
+        bot_thread.start()
+        output = 'הבוט מתחיל...'.encode('utf-8')
+    elif bot_is_ready:
+        logger.info('הבוט מחובר ומוכן.')
         output = 'הבוט פועל ומחובר!'.encode('utf-8')
     else:
-        output = 'הבוט מתחיל...'.encode('utf-8')
+        logger.info('הבוט עדיין מתחבר...')
+        output = 'הבוט עדיין מתחבר...'.encode('utf-8')
+    
     response_headers = [('Content-type', 'text/plain; charset=utf-8'), ('Content-Length', str(len(output)))]
     start_response(status, response_headers)
     return [output]
 
-# הרצת הבוט ב-Thread
+logger.info('מודול WSGI נטען.')
+
 if __name__ == "__main__":
-    logging.info('מתחיל את התהליך...')
-    bot_thread = Thread(target=run_bot)
-    bot_thread.start()
-    logging.info('הרצת הבוט ב-Thread התחילה.')
-    
-    # המתנה עד שהבוט מוכן
-    while not bot_is_ready:
-        logging.info('ממתין שהבוט יתחבר...')
-        asyncio.sleep(1)
-    
-    logging.info('הבוט מחובר ומוכן!')
+    logger.info('הרצת הסקריפט באופן ישיר.')
+    run_bot()
