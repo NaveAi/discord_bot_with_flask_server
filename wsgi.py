@@ -91,3 +91,4 @@ def application(environ, start_response):
 # הרצת הבוט ב-Thread
 if __name__ == "__main__":
     Thread(target=run_bot).start()
+    logging.info('הרצת הבוט ב-Thread התחילה.')
