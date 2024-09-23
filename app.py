@@ -2,11 +2,10 @@ import discord
 import cohere
 import os
 import logging
-from fastapi import FastAPI
-import uvicorn
+from flask import Flask, jsonify
 from threading import Thread
 
-app = FastAPI()
+app = Flask(__name__)
 
 class DiscordBot:
     def __init__(self):
@@ -82,10 +81,10 @@ def run_bot():
     bot = DiscordBot()
     bot.run()
 
-@app.get("/")
+@app.route("/")
 def read_root():
-    return {"message": "הבוט פועל!"}
+    return jsonify({"message": "הבוט פועל!"})
 
 if __name__ == "__main__":
     Thread(target=run_bot).start()
-    uvicorn.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8000)))
