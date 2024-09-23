@@ -2,7 +2,8 @@ import discord
 import cohere
 import os
 import logging
-
+from fastapi import FastAPI
+import uvicorn
 from threading import Thread
 
 app = FastAPI()
